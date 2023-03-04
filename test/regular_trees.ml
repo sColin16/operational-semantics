@@ -1,1 +1,0 @@
-Printf.printf "%i" (RegularTrees.fact 4)

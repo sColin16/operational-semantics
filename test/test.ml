@@ -1,0 +1,1 @@
+Printf.printf "%i" (Regular_trees.fact 4)
