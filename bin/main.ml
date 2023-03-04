@@ -1,5 +1,6 @@
 (** TODO: can these just be polymorphic types that can accept anything, not just strings?
  * This would require everything to become polymoprhic, which I don't know if that can be done with the sets and maps
+ * But we can make our own module for RegularTrees just like Sets and then pass the parametric type through!
  *)
 type symbol = Symbol of string
 type non_terminal = NonTerminal of string
@@ -57,23 +58,20 @@ let rec tree_valid (alpha: ranked_alphabet) (tree_inst: tree) =
 
 let rec sent_tree_valid (non_terms: NonTerminalSet.t) (alpha: ranked_alphabet) (sent_tree: sentential_tree) =
     match sent_tree with
-    | Leaf(non_term) -> (match (NonTerminalSet.find_opt non_term non_terms) with
-        | None -> false
-        | Some(_) -> true)
+    | Leaf(non_term) -> NonTerminalSet.mem non_term non_terms
     | Node(symbols, args) -> (match (SymbolMap.find_opt symbols alpha) with
         | None -> false
         | Some(arity) ->
             (List.length args) = arity &&
             List.for_all (sent_tree_valid non_terms alpha) args)
 
-let production_valid (non_terms: NonTerminalSet.t) (alpha: ranked_alphabet) (production: non_terminal * SententialTreeSet.t) =
-    let (non_term, tree_set) = production in
-        match NonTerminalSet.find_opt non_term non_terms with
-        | None -> false
-        | Some(_) -> SententialTreeSet.for_all (sent_tree_valid non_terms alpha) tree_set
+let production_valid (non_terms: NonTerminalSet.t) (alpha: ranked_alphabet) (non_term: non_terminal) (tree_set: SententialTreeSet.t) =
+    if NonTerminalSet.mem non_term non_terms then
+        SententialTreeSet.for_all (sent_tree_valid non_terms alpha) tree_set
+    else false
 
 let productions_valid (non_terms: NonTerminalSet.t) (alpha: ranked_alphabet) (productions: tree_grammar_productions) =
-    NonTerminalMap.for_all (fun non_term tree_set -> production_valid non_terms alpha (non_term, tree_set)) productions
+    NonTerminalMap.for_all (production_valid non_terms alpha) productions
 
 let grammar_valid (grammar: regular_tree_grammar) =
     NonTerminalSet.mem grammar.start_non_terminal grammar.non_terminals &&
