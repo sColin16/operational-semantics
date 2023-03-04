@@ -2,3 +2,6 @@
  (public_name regular_trees)
  (name main)
  (libraries regular_trees))
+(env
+  (dev
+    (flags (:standard -warn-error -A))))
