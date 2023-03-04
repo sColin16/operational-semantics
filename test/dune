@@ -1,2 +1,3 @@
 (test
- (name regular_trees))
+ (name regular_trees)
+ (libraries regularTrees))
