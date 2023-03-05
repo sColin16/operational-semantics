@@ -30,6 +30,7 @@ let production_valid (non_terms: NonTerminalSet.t) (alpha: ranked_alphabet) (non
 let productions_valid (non_terms: NonTerminalSet.t) (alpha: ranked_alphabet) (productions: tree_grammar_productions) =
     NonTerminalMap.for_all (production_valid non_terms alpha) productions
 
+(** TODO: also check that the alphabet has at least one unary symbol so trees in the language are finite *)
 let grammar_valid (grammar: regular_tree_grammar) =
     NonTerminalSet.mem grammar.start_non_terminal grammar.non_terminals &&
     productions_valid grammar.non_terminals grammar.ranked_alphabet grammar.productions

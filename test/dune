@@ -1,3 +1,3 @@
 (test
- (name test)
- (libraries regular_trees))
+ (name trees)
+ (libraries regular_trees alcotest))
