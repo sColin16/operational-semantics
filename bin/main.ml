@@ -1,4 +1,4 @@
-open Regular_trees
+open Regular_tree_language
 
 let non_terms = NonTerminalSet.of_list [NonTerminal("t"); NonTerminal("v")]
 let alpha = SymbolMap.of_seq (List.to_seq [(Symbol("if"), 3); (Symbol("true"), 0); (Symbol("false"), 0)])
