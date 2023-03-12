@@ -1,5 +1,7 @@
 (library
  (name regular_tree_language))
+
 (env
-  (dev
-    (flags (:standard -warn-error -A))))
+ (dev
+  (flags
+   (:standard -warn-error -A))))
