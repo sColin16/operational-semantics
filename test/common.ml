@@ -1,9 +1,19 @@
+(* A few helper test function because Alcotest is unecessarily verbose for most use cases *)
+let assert_bool name expected actual =
+  let test_function () = Alcotest.(check bool) name expected actual in
+  Alcotest.test_case name `Quick test_function
+
+let assert_true name value = assert_bool name true value
+let assert_false name value = assert_bool name false value
+
 type test_symbols = True | False | If
 type test_non_terminals = T | V | A | B
 type boolean_symbols = True | False | Not | And | Or | If
 type boolean_non_terminals = T | V
 type arithmetic_symbols = Zero | Succ | Plus
 type arithmetic_non_terminals = T | V
+
+
 
 let test_ranked_alphabet (symbol : test_symbols) =
   match symbol with True -> 0 | False -> 0 | If -> 3
