@@ -1,13 +1,11 @@
 module type REG_TREE_ALPHABET = sig
-  (* TODO: consider making these polymorphic types instead of part of this signature *)
-  (* Might be complicated to specify the type stuff, like the Map/Set modules *)
   type symbol
   type non_terminal
 
   val ranked_alphabet : symbol -> int
 end
 
-(* Benefit of extracting this signature from the functor type*)
+(* TODO: can we make symbol and non-terminal polymorphic types? Can we still use Set/Map packages that way? *)
 module type REG_TREE_GRAMMAR = sig
   type symbol
   type non_terminal
@@ -21,6 +19,7 @@ module type REG_TREE_GRAMMAR = sig
 
   (* TODO: give the ability to attach the non-terminal with invalid productions to this *)
   exception Invalid_production of string
+  exception Invalid_tree of string
 
   val create_grammar :
     non_terminal -> (non_terminal -> sent_tree list) -> grammar
@@ -78,6 +77,7 @@ functor
 
       let compare = compare
     end)
+
     type a = NonTermSet.elt
 
     module NonTermSentTreeSet = Set.Make (struct
@@ -91,6 +91,7 @@ functor
     type grammar = { start : non_terminal; productions : productions }
 
     exception Invalid_production of string
+    exception Invalid_tree of string
 
     let rec sent_tree_in_alphabet (tree : sent_tree) =
       match tree with
@@ -183,7 +184,6 @@ functor
     (* TODO: document that this function will raise an exception if productinos are invalid, and what the *)
     let create_grammar (start : non_terminal)
         (productions : non_terminal -> sent_tree list) =
-      let () = Printf.printf "Running" in
       let all_non_terms = _reachable_non_terms start productions in
       let all_productions_valid =
         NonTermSet.for_all
@@ -207,7 +207,11 @@ functor
         NonTermSentTreeSet.empty
 
     let is_element (tree : tree) (grammar : grammar) =
-      is_sent_element (tree :> sent_tree) grammar
+      if tree_in_alphabet tree then is_sent_element (tree :> sent_tree) grammar
+      else
+        raise
+          (Invalid_tree
+             "The provided tree did not belong to the grammar's alphabet")
   end
 
 module type MAKE_FUNCTOR = functor (Alphabet : REG_TREE_ALPHABET) ->

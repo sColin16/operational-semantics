@@ -1,21 +1,13 @@
-open Common
+open TestHelpers
+open Example.Boolean
 
-let single_node_tree : TestGrammar.tree = `Symbol (True, [])
+let single_node_tree = parse_boolean_tree True
 
 (* If has arity 3, not 0 *)
-let single_node_tree_bad_arity : TestGrammar.tree = `Symbol (If, [])
+let single_node_tree_bad_arity : BooleanGrammar.tree = `Symbol (If, [])
+let large_tree = parse_boolean_tree (If (If (True, False, True), False, True))
 
-let large_tree : TestGrammar.tree =
-  `Symbol
-    ( If,
-      [
-        `Symbol
-          (If, [ `Symbol (True, []); `Symbol (False, []); `Symbol (True, []) ]);
-        `Symbol (False, []);
-        `Symbol (True, []);
-      ] )
-
-let large_tree_bad_arity : TestGrammar.tree =
+let large_tree_bad_arity : BooleanGrammar.tree =
   `Symbol
     ( If,
       [
@@ -25,18 +17,10 @@ let large_tree_bad_arity : TestGrammar.tree =
         `Symbol (True, []);
       ] )
 
-let non_term_sent_tree : TestGrammar.sent_tree = `NonTerminal T
+let non_term_sent_tree = parse_boolean_sent_tree T
+let large_sent_tree = parse_boolean_sent_tree (If (False, V, If (True, T, V)))
 
-let large_sent_tree : TestGrammar.sent_tree =
-  `Symbol
-    ( If,
-      [
-        `Symbol (False, []);
-        `NonTerminal V;
-        `Symbol (If, [ `Symbol (True, []); `NonTerminal T; `NonTerminal V ]);
-      ] )
-
-let bad_arity_sent_tree : TestGrammar.sent_tree =
+let bad_arity_sent_tree : BooleanGrammar.sent_tree =
   `Symbol
     ( If,
       [
@@ -47,16 +31,16 @@ let bad_arity_sent_tree : TestGrammar.sent_tree =
       ] )
 
 let assert_tree_in_alpha expected name tree =
-  assert_bool name expected (TestGrammar.tree_in_alphabet tree)
+  assert_bool name expected (BooleanGrammar.tree_in_alphabet tree)
 
 let assert_sent_tree_in_alpha expected name sent_tree =
-  assert_bool name expected (TestGrammar.sent_tree_in_alphabet sent_tree)
+  assert_bool name expected (BooleanGrammar.sent_tree_in_alphabet sent_tree)
 
 let () =
   let open Alcotest in
-  run "Regular Trees"
+  run "Tree Validity"
     [
-      ( "tree_in_alphabet",
+      ( "tree validity",
         [
           assert_tree_in_alpha true "single node tree" single_node_tree;
           assert_tree_in_alpha true "large tree" large_tree;
@@ -64,20 +48,20 @@ let () =
             single_node_tree_bad_arity;
           assert_tree_in_alpha false "large tree bad arity" large_tree_bad_arity;
         ] );
-      ( "sent_tree_in_alphabet",
+      ( "sentential tree validity",
         [
           assert_sent_tree_in_alpha true "non term sent tree" non_term_sent_tree;
           assert_sent_tree_in_alpha true "large sent tree" large_sent_tree;
           assert_sent_tree_in_alpha false "sent tree bad arity"
             bad_arity_sent_tree;
           assert_sent_tree_in_alpha true "single node sent tree"
-            (single_node_tree :> TestGrammar.sent_tree);
+            (single_node_tree :> BooleanGrammar.sent_tree);
           assert_sent_tree_in_alpha true "large tree as sent tree"
-            (large_tree :> TestGrammar.sent_tree);
+            (large_tree :> BooleanGrammar.sent_tree);
           assert_sent_tree_in_alpha false
             "single node tree bad arity as sent tree"
-            (single_node_tree_bad_arity :> TestGrammar.sent_tree);
+            (single_node_tree_bad_arity :> BooleanGrammar.sent_tree);
           assert_sent_tree_in_alpha false "large tree bad arity as sent tree"
-            (large_tree_bad_arity :> TestGrammar.sent_tree);
+            (large_tree_bad_arity :> BooleanGrammar.sent_tree);
         ] );
     ]
