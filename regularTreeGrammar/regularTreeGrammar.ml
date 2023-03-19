@@ -1,4 +1,4 @@
-module type RegTreeAlphabet = sig
+module type REG_TREE_ALPHABET = sig
   (* TODO: consider making these polymorphic types instead of part of this signature *)
   (* Might be complicated to specify the type stuff, like the Map/Set modules *)
   type symbol
@@ -7,25 +7,29 @@ module type RegTreeAlphabet = sig
   val ranked_alphabet : symbol -> int
 end
 
-module type RegTreeFunctor = functor (Alphabet : RegTreeAlphabet) -> sig
-  type tree = [ `Symbol of Alphabet.symbol * tree list ]
+(* Benefit of extracting this signature from the functor type*)
+module type REG_TREE_GRAMMAR = sig
+  type symbol
+  type non_terminal
+  type tree = [ `Symbol of symbol * tree list ]
 
   type sent_tree =
-    [ `Symbol of Alphabet.symbol * sent_tree list
-    | `NonTerminal of Alphabet.non_terminal ]
+    [ `Symbol of symbol * sent_tree list | `NonTerminal of non_terminal ]
 
   type grammar
   type sent_tree_set
 
-  val create_grammar :
-    Alphabet.non_terminal ->
-    (Alphabet.non_terminal -> sent_tree list) ->
-    grammar
-
   (* TODO: give the ability to attach the non-terminal with invalid productions to this *)
   exception Invalid_production of string
 
+  val create_grammar :
+    non_terminal -> (non_terminal -> sent_tree list) -> grammar
+  (** [create_grammar start_non_term productions] creates a grammar with the given productions and the given start non terminal *)
+
   val tree_in_alphabet : tree -> bool
+  (** [tree_in_alphabet tree] Determines if the provided tree is valid with
+  regard to the ranked alphabet for the grammar *)
+
   val sent_tree_in_alphabet : sent_tree -> bool
   val is_element : tree -> grammar -> bool
   val is_sent_element : sent_tree -> grammar -> bool
@@ -33,11 +37,14 @@ end
 
 (* TODO: should this be called Make like the map and set equivalents *)
 (* TODO: should we have submodules for creating trees and sent_trees *)
-module RegTreeGrammar : RegTreeFunctor =
+(* module RegTreeGrammarFunctor(Alphabet : RegTreeAlphabet) : (RegTreeGrammarType with type symbol = Alphabet.symbol and type non_terminal = Alphabet.non_terminal) = *)
+module RegTreeGrammarImplementation =
 functor
-  (Alphabet : RegTreeAlphabet)
+  (Alphabet : REG_TREE_ALPHABET)
   ->
   struct
+    type symbol = Alphabet.symbol
+    type non_terminal = Alphabet.non_terminal
     type tree = [ `Symbol of Alphabet.symbol * tree list ]
 
     type sent_tree =
@@ -58,6 +65,7 @@ functor
       * We can't manipulate the set of symbols and non-terminals at runtime, identifying and removing useless ones, for example
       * Possibly overly restrictive type safety that makes it difficult to construct new non-terminals at runtime?
       * No ability to use a subset of a larger type, like strings (unless you do something weird like make the ranked alphabet have arity of -1 for all other symbols)
+      * No readily available list of non-terminals, must either have them passed or compute reachable ones from the productions
     *)
     module SentTreeSet = Set.Make (struct
       type t = sent_tree
@@ -66,20 +74,21 @@ functor
     end)
 
     module NonTermSet = Set.Make (struct
-      type t = Alphabet.non_terminal
+      type t = non_terminal
 
       let compare = compare
     end)
+    type a = NonTermSet.elt
 
     module NonTermSentTreeSet = Set.Make (struct
-      type t = Alphabet.non_terminal * sent_tree
+      type t = non_terminal * sent_tree
 
       let compare = compare
     end)
 
     type sent_tree_set = SentTreeSet.t
-    type productions = Alphabet.non_terminal -> SentTreeSet.t
-    type grammar = { start : Alphabet.non_terminal; productions : productions }
+    type productions = non_terminal -> SentTreeSet.t
+    type grammar = { start : non_terminal; productions : productions }
 
     exception Invalid_production of string
 
@@ -90,7 +99,7 @@ functor
           List.length children = Alphabet.ranked_alphabet sym
           && List.for_all sent_tree_in_alphabet children
 
-    let rec tree_in_alphabet (tree : tree) =
+    let tree_in_alphabet (tree : tree) =
       sent_tree_in_alphabet (tree :> sent_tree)
 
     (* The queried argument tracks which instances of the function were called
@@ -98,7 +107,7 @@ functor
        logical loop where the sent tree is derivable from the non-terminal iff it
        is derivable. However, if we assume it is derivable, there is not a finite
        number of steps for the derivation, so we conclude false *)
-    let rec _is_sent_element_non_term (non_term : Alphabet.non_terminal)
+    let rec _is_sent_element_non_term (non_term : non_terminal)
         (sent_tree : sent_tree) (productions : productions)
         (queried : NonTermSentTreeSet.t) =
       if NonTermSentTreeSet.mem (non_term, sent_tree) queried then false
@@ -146,9 +155,9 @@ functor
           List.fold_left NonTermSet.union NonTermSet.empty
             (List.map _non_terms_in_sent_tree children)
 
-    let rec _reachable_non_terms_rec (start : Alphabet.non_terminal)
-        (productions : Alphabet.non_terminal -> sent_tree list)
-        (visited : NonTermSet.t) =
+    let rec _reachable_non_terms_rec (start : non_terminal)
+        (productions : non_terminal -> sent_tree list) (visited : NonTermSet.t)
+        =
       if NonTermSet.mem start visited then
         (* The non terminal has already been processed, so skip processing it again *)
         NonTermSet.empty
@@ -166,14 +175,14 @@ functor
         Seq.fold_left accumulate_non_terms new_visited
           (NonTermSet.to_seq neighbors)
 
-    let _reachable_non_terms (start : Alphabet.non_terminal)
-        (productions : Alphabet.non_terminal -> sent_tree list) =
+    let _reachable_non_terms (start : non_terminal)
+        (productions : non_terminal -> sent_tree list) =
       _reachable_non_terms_rec start productions NonTermSet.empty
 
     (* TODO: consider extracting the non-terminals by crawling the productions *)
     (* TODO: document that this function will raise an exception if productinos are invalid, and what the *)
-    let create_grammar (start : Alphabet.non_terminal)
-        (productions : Alphabet.non_terminal -> sent_tree list) =
+    let create_grammar (start : non_terminal)
+        (productions : non_terminal -> sent_tree list) =
       let () = Printf.printf "Running" in
       let all_non_terms = _reachable_non_terms start productions in
       let all_productions_valid =
@@ -200,3 +209,10 @@ functor
     let is_element (tree : tree) (grammar : grammar) =
       is_sent_element (tree :> sent_tree) grammar
   end
+
+module type MAKE_FUNCTOR = functor (Alphabet : REG_TREE_ALPHABET) ->
+  REG_TREE_GRAMMAR
+    with type symbol = Alphabet.symbol
+     and type non_terminal = Alphabet.non_terminal
+
+module Make : MAKE_FUNCTOR = RegTreeGrammarImplementation

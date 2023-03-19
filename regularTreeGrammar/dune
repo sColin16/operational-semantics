@@ -1,5 +1,5 @@
 (library
- (name regular_tree_language))
+ (name regularTreeGrammar))
 
 (env
  (dev

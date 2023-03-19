@@ -3,6 +3,18 @@ let assert_bool name expected actual =
   let test_function () = Alcotest.(check bool) name expected actual in
   Alcotest.test_case name `Quick test_function
 
+let assert_raises name exn test_func =
+  let assertion () = Alcotest.check_raises name exn test_func in
+  Alcotest.test_case name `Quick assertion
+
+let assert_no_raises name test_func =
+  let assertion () = Alcotest.(check bool) name true
+  (try
+    let () = test_func () in
+    true
+  with raised_exn -> raise raised_exn) in
+  Alcotest.test_case name `Quick assertion
+
 let assert_true name value = assert_bool name true value
 let assert_false name value = assert_bool name false value
 
@@ -12,8 +24,6 @@ type boolean_symbols = True | False | Not | And | Or | If
 type boolean_non_terminals = T | V
 type arithmetic_symbols = Zero | Succ | Plus
 type arithmetic_non_terminals = T | V
-
-
 
 let test_ranked_alphabet (symbol : test_symbols) =
   match symbol with True -> 0 | False -> 0 | If -> 3
@@ -30,21 +40,21 @@ let boolean_ranked_alphabet (symbol : boolean_symbols) =
 let arithmetic_ranked_alphabet (symbol : arithmetic_symbols) =
   match symbol with Zero -> 0 | Succ -> 1 | Plus -> 2
 
-module TestGrammar = Regular_tree_language.RegTreeGrammar (struct
+module TestGrammar = RegularTreeGrammar.Make (struct
   type symbol = test_symbols
   type non_terminal = test_non_terminals
 
   let ranked_alphabet = test_ranked_alphabet
 end)
 
-module BooleanGrammar = Regular_tree_language.RegTreeGrammar (struct
+module BooleanGrammar = RegularTreeGrammar.Make (struct
   type symbol = boolean_symbols
   type non_terminal = boolean_non_terminals
 
   let ranked_alphabet = boolean_ranked_alphabet
 end)
 
-module ArithmeticGrammar = Regular_tree_language.RegTreeGrammar (struct
+module ArithmeticGrammar = RegularTreeGrammar.Make (struct
   type symbol = arithmetic_symbols
   type non_terminal = arithmetic_non_terminals
 
