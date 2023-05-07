@@ -1,23 +1,21 @@
 module type GRAMMAR_PATTERN_ASSIGNMENTS = sig
   type t
-  type non_terminal
-  type grammar
   type sentence
 
+  (* TODO: should the type be extracted from the collection into this type? Substituted out? *)
   (* I have decided to include this as a value in the module, as it is part of the semantics. You must be using the same
-     grammar collection ot merge assignments, and including this in the module enforces that at the type level *)
-
-  val grammar_collection : non_terminal -> grammar
-  (** A mapping definig the grammar for each non-terminal. Usually, these all share the same productions *)
+     grammar collection to merge assignments, and including this in the module enforces that at the type level *)
+  module GrammarCollection : GrammarCollection.GRAMMAR_COLLECTION
 
   val empty : t
   (** An empty assignment mapping *)
 
-  val singleton_opt : non_terminal * int -> sentence -> t option
+  val singleton_opt :
+    GrammarCollection.non_terminal * int -> sentence -> t option
   (** [singleton_opt key sentence] returns a singleton assignment mapping, if
       the sentence is assignable to the given key *)
 
-  val find_opt : non_terminal * int -> t -> sentence option
+  val find_opt : GrammarCollection.non_terminal * int -> t -> sentence option
   (** [find_opt key assignment] returns the corresponding assignment for the
       key, if it exists *)
 
@@ -26,9 +24,14 @@ module type GRAMMAR_PATTERN_ASSIGNMENTS = sig
 end
 
 module type TREE_ASSIGNMENT_INPUT = sig
-  module TreeGrammar : Grammar.GRAMMAR
+  type non_terminal
 
-  val grammar_collection : TreeGrammar.non_terminal -> TreeGrammar.t
+  module Grammar : Grammar.GRAMMAR with type non_terminal = non_terminal
+
+  module GrammarCollection :
+    GrammarCollection.GRAMMAR_COLLECTION
+      with type grammar = Grammar.t
+       and type non_terminal = non_terminal
 end
 
 module AssignmentsImpl =
@@ -37,26 +40,24 @@ functor
   (Input : TREE_ASSIGNMENT_INPUT)
   ->
   struct
-    type non_terminal = Input.TreeGrammar.non_terminal
-    type grammar = Input.TreeGrammar.t
-    type sentence = Input.TreeGrammar.sentence
+    type sentence = Input.Grammar.sentence
 
-    module GrammarElement = GrammarElementMake (Input.TreeGrammar)
+    module GrammarCollection = Input.GrammarCollection
+    module GrammarElement = GrammarElementMake (Input.Grammar)
 
     module AssignmentMap = Map.Make (struct
-      type t = non_terminal * int
+      type t = Input.GrammarCollection.non_terminal * int
 
       let compare = compare
     end)
 
     type t = GrammarElement.t AssignmentMap.t
 
-    let grammar_collection = Input.grammar_collection
     let empty = AssignmentMap.empty
 
     let singleton_opt key tree =
       let non_term, index = key in
-      match GrammarElement.create_opt tree (grammar_collection non_term) with
+      match GrammarElement.create_opt tree (Input.GrammarCollection.mapping non_term) with
       | Some wrapped_elt ->
           Some (AssignmentMap.singleton (non_term, index) wrapped_elt)
       | None -> None
@@ -86,9 +87,8 @@ functor
 
 module type MAKE_FUNCTOR = functor (Input : TREE_ASSIGNMENT_INPUT) ->
   GRAMMAR_PATTERN_ASSIGNMENTS
-    with type non_terminal = Input.TreeGrammar.non_terminal
-     and type grammar = Input.TreeGrammar.t
-     and type sentence = Input.TreeGrammar.sentence
+    with type sentence = Input.Grammar.sentence
+    and module GrammarCollection = Input.GrammarCollection
 
 module type CUSTOM_MAKE_FUNCTOR = functor
   (_ : SetElement.MAKE_SENTENCE_FUNCTOR)

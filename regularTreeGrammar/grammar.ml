@@ -128,21 +128,3 @@ module type MAKE_FUNCTOR = functor (Input : TREE_GRAMMAR_INPUT) ->
      and type sentence = Input.Tree.t
 
 module Make : MAKE_FUNCTOR = TreeGrammarImpl
-
-module type TREE_GRAMMAR = sig
-  type non_terminal
-
-  module RankedAlphabet : Common.RANKED_ALPHABET
-  module Tree : Tree.TREE with module RankedAlphabet := RankedAlphabet
-
-  module SententialTree :
-    SententialTree.SENT_TREE
-      with type non_terminal := non_terminal
-       and module RankedAlphabet := RankedAlphabet
-
-  module Grammar :
-    GRAMMAR
-      with type non_terminal = non_terminal
-       and type sentence = Tree.t
-       and type sentential_form = SententialTree.t
-end

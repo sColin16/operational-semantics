@@ -3,6 +3,7 @@ module type SEMANTICS = sig
   type term
   type eval_rule
 
+  (* TODO: should we make this more abstract and just have an eval_rules type to get rid of the list requriement? *)
   val of_rules : eval_rule list -> t
   (** [of_rules eval_rules] Creates a semantics definition from the list of evaluation rules *)
 
@@ -13,30 +14,21 @@ module type SEMANTICS = sig
       evaluation relation *)
 end
 
-module type INPUT = sig
-  type non_terminal
-
-  module RankedAlphabet : Common.RANKED_ALPHABET
-
-  module RegularPattern :
-    Pattern.REGULAR_PATTERN
-      with type non_terminal = non_terminal
-       and module RankedAlphabet = RankedAlphabet
-
-  module EvalRule :
-    EvalRule.EVAL_RULE
-      with type term = RegularPattern.TreeGrammar.Tree.t
-       and type pattern = RegularPattern.Pattern.t
-end
-
 module SemanticsImpl =
 functor
-  (Input : INPUT)
+  (EvalRuleMake : EvalRule.MAKE_FUNCTOR)
+  (Input : Pattern.REGULAR_PATTERN)
   ->
   struct
-    type term = Input.RegularPattern.TreeGrammar.Tree.t
-    type eval_rule = Input.EvalRule.t
-    type t = eval_rule list
+    type term = Input.TreeGrammar.Tree.t
+    type pattern = Input.Pattern.t
+    type eval_relation = pattern * pattern
+    type eval_rule = eval_relation list * eval_relation
+
+    (* TODO: consider deconstructing this module to decouple the types *)
+    module EvalRule = EvalRuleMake (Input)
+
+    type t = EvalRule.t list
 
     module TermSet = Set.Make (struct
       type t = term
@@ -44,16 +36,19 @@ functor
       let compare = compare
     end)
 
-    let of_rules eval_rules = eval_rules
+    let of_rules eval_rules =
+      List.map
+        (fun eval_rule ->
+          let premises, conclusion = eval_rule in
+          EvalRule.of_patterns premises conclusion)
+        eval_rules
 
     let rec try_rule (semantics : t) (term : term) (queried : TermSet.t)
-        (acc : term option) (eval_rule : eval_rule) =
+        (acc : term option) (eval_rule : EvalRule.t) =
       match acc with
       | Some _ -> acc
       | None ->
-          Input.EvalRule.evaluate eval_rule
-            (evaluate_rec semantics queried)
-            term
+          EvalRule.evaluate eval_rule (evaluate_rec semantics queried) term
 
     and evaluate_rec (semantics : t) (queried : TermSet.t) (term : term) =
       if TermSet.mem term queried then None
@@ -66,9 +61,14 @@ functor
       evaluate_rec semantics TermSet.empty term
   end
 
-module type MAKE_FUNCTOR = functor (Input : INPUT) ->
+module type MAKE_FUNCTOR = functor (Input : Pattern.REGULAR_PATTERN) ->
   SEMANTICS
-    with type term = Input.RegularPattern.TreeGrammar.Tree.t
-     and type eval_rule = Input.EvalRule.t
+    with type term = Input.TreeGrammar.Tree.t
+     and type eval_rule =
+      (Input.Pattern.t * Input.Pattern.t) list
+      * (Input.Pattern.t * Input.Pattern.t)
 
-module Make : MAKE_FUNCTOR = SemanticsImpl
+module type CUSTOM_MAKE_FUNCTOR = functor (_ : EvalRule.MAKE_FUNCTOR) -> MAKE_FUNCTOR
+
+module CustomMake : CUSTOM_MAKE_FUNCTOR = SemanticsImpl
+module Make : MAKE_FUNCTOR = CustomMake (EvalRule.Make)

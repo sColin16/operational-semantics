@@ -10,6 +10,9 @@
     and concrete trees are a subset of sentential trees
 *)
 
+(* How useful is this module really? I don't really know if I want this in any prublic-facing
+   types. I think it would only be an internal module for implementations *)
+
 (** A module whose type is guaranteed to belong to some set, usually an infinite
     one. This allows you to express a type for a value that belongs to a set that
     is not directable expressable with a standard type. It can't be type-checked
@@ -78,7 +81,7 @@ module type PATTERN_TREE_INPUT = sig
   module RankedAlphabet : Common.RANKED_ALPHABET
 
   module TreeGrammar :
-    Grammar.TREE_GRAMMAR
+    TreeGrammar.TREE_GRAMMAR
       with type non_terminal := non_terminal
        and module RankedAlphabet := RankedAlphabet
 

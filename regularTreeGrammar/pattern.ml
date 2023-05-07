@@ -43,7 +43,7 @@ module type REG_TREE_PATTERN_INPUT = sig
      about that is kinda like worrying about passing functions instead of modules: it adds additional complexity
      and more tightly couple the input here to the implementation below *)
   module TreeGrammar :
-    Grammar.TREE_GRAMMAR
+    TreeGrammar.TREE_GRAMMAR
       with module RankedAlphabet := RankedAlphabet
        and type non_terminal := non_terminal
 
@@ -52,16 +52,19 @@ module type REG_TREE_PATTERN_INPUT = sig
       with module RankedAlphabet := RankedAlphabet
        and type non_terminal := non_terminal
 
-  (* TODO: somehow need to constrain the grammar collection for this to match? *)
+  module GrammarCollection :
+    GrammarCollection.GRAMMAR_COLLECTION
+      with type grammar = TreeGrammar.Grammar.t
+       and type non_terminal = non_terminal
+
   module TreePatternAssignments :
     TreePatternAssignments.GRAMMAR_PATTERN_ASSIGNMENTS
-      with type non_terminal = non_terminal
-       and type grammar = TreeGrammar.Grammar.t
-       and type sentence = TreeGrammar.Grammar.sentence
+      with type sentence = TreeGrammar.Tree.t
+       and module GrammarCollection = GrammarCollection
 
-  (* TODO: should this be a grammar instance instead? Or do we constrain it to be part of the grammar collection? *)
+  (* TODO: should this be part of the grammar collection? It seems like it should maybe be constrained through
+     the different types from semantics *)
   val primary_non_terminal : non_terminal
-  val grammar_collection : non_terminal -> TreeGrammar.Grammar.t
 end
 
 module TreePatternImpl =
@@ -117,7 +120,7 @@ functor
 
     let create (pattern_tree : input) =
       let primary_grammar =
-        Input.grammar_collection Input.primary_non_terminal
+        Input.GrammarCollection.mapping Input.primary_non_terminal
       in
       match ValidPatternTree.create_opt pattern_tree primary_grammar with
       | Some valid_tree -> valid_tree
@@ -155,7 +158,7 @@ module type REGULAR_PATTERN = sig
   module RankedAlphabet : Common.RANKED_ALPHABET
 
   module TreeGrammar :
-    Grammar.TREE_GRAMMAR
+    TreeGrammar.TREE_GRAMMAR
       with type non_terminal = non_terminal
       with module RankedAlphabet = RankedAlphabet
 
@@ -164,11 +167,15 @@ module type REGULAR_PATTERN = sig
       with module RankedAlphabet := RankedAlphabet
        and type non_terminal := non_terminal
 
+  (* I'm not a fan of this grammar collection being part of this type. Not sure how to avoid it though... *)
+  module GrammarCollection : GrammarCollection.GRAMMAR_COLLECTION
+    with type grammar = TreeGrammar.Grammar.t
+    and type non_terminal = non_terminal
+
   module TreePatternAssignments :
     TreePatternAssignments.GRAMMAR_PATTERN_ASSIGNMENTS
-      with type non_terminal = non_terminal
-       and type grammar = TreeGrammar.Grammar.t
-       and type sentence = TreeGrammar.Grammar.sentence
+      with type sentence = TreeGrammar.Grammar.sentence
+       and module GrammarCollection = GrammarCollection
 
   module Pattern :
     PATTERN

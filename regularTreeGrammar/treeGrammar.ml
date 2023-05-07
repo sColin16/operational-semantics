@@ -1,3 +1,4 @@
+(* TODO: should we flatten this so that the grammar functions are at the top-level here? *)
 module type TREE_GRAMMAR = sig
   type non_terminal
 
