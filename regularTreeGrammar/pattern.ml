@@ -47,7 +47,7 @@ module type REG_TREE_PATTERN_INPUT = sig
       with module RankedAlphabet := RankedAlphabet
        and type non_terminal := non_terminal
 
-  module RegularPatternTree :
+  module PatternTree :
     PatternTree.REGULAR_PATTERN_TREE
       with module RankedAlphabet := RankedAlphabet
        and type non_terminal := non_terminal
@@ -61,10 +61,6 @@ module type REG_TREE_PATTERN_INPUT = sig
     TreePatternAssignments.GRAMMAR_PATTERN_ASSIGNMENTS
       with type sentence = TreeGrammar.Tree.t
        and module GrammarCollection = GrammarCollection
-
-  (* TODO: should this be part of the grammar collection? It seems like it should maybe be constrained through
-     the different types from semantics *)
-  val primary_non_terminal : non_terminal
 end
 
 module TreePatternImpl =
@@ -78,17 +74,17 @@ functor
 
       module RankedAlphabet = Input.RankedAlphabet
       module TreeGrammar = Input.TreeGrammar
-      module PatternTree = Input.RegularPatternTree
+      module PatternTree = Input.PatternTree
     end)
 
     type obj = Input.TreeGrammar.Tree.t
     type assignments = Input.TreePatternAssignments.t
-    type input = Input.RegularPatternTree.t
+    type input = Input.PatternTree.t
     type t = ValidPatternTree.t
 
-    let rec match_on_rec (pattern : Input.RegularPatternTree.t) (tree : obj) =
+    let rec match_on_rec (pattern : Input.PatternTree.t) (tree : obj) =
       match
-        ( Input.RegularPatternTree.destructure pattern,
+        ( Input.PatternTree.destructure pattern,
           Input.TreeGrammar.Tree.destructure tree )
       with
       | Symbol (pattern_symbol, pattern_children), (tree_symbol, tree_children)
@@ -102,9 +98,9 @@ functor
             (pattern_non_term, pattern_index)
             tree
 
-    let rec substitute_with_rec (pattern : Input.RegularPatternTree.t)
+    let rec substitute_with_rec (pattern : Input.PatternTree.t)
         (assignments : assignments) =
-      match Input.RegularPatternTree.destructure pattern with
+      match Input.PatternTree.destructure pattern with
       | Symbol (symbol, children) ->
           Input.TreeGrammar.Tree.node symbol
             (List.map
@@ -120,7 +116,7 @@ functor
 
     let create (pattern_tree : input) =
       let primary_grammar =
-        Input.GrammarCollection.mapping Input.primary_non_terminal
+        Input.GrammarCollection.mapping Input.GrammarCollection.start_non_terminal
       in
       match ValidPatternTree.create_opt pattern_tree primary_grammar with
       | Some valid_tree -> valid_tree
@@ -140,7 +136,7 @@ functor
 
 module type MAKE_FUNCTOR = functor (Input : REG_TREE_PATTERN_INPUT) ->
   PATTERN
-    with type input = Input.RegularPatternTree.t
+    with type input = Input.PatternTree.t
      and type obj = Input.TreeGrammar.Tree.t
      and type assignments = Input.TreePatternAssignments.t
 
@@ -150,36 +146,3 @@ module type CUSTOM_MAKE_FUNCTOR = functor
 
 module CustomMake : CUSTOM_MAKE_FUNCTOR = TreePatternImpl
 module Make : MAKE_FUNCTOR = TreePatternImpl (SetElement.MakePatternTree)
-
-(** TODO: does this need to accept grammar collection somewhere? *)
-module type REGULAR_PATTERN = sig
-  type non_terminal
-
-  module RankedAlphabet : Common.RANKED_ALPHABET
-
-  module TreeGrammar :
-    TreeGrammar.TREE_GRAMMAR
-      with type non_terminal = non_terminal
-      with module RankedAlphabet = RankedAlphabet
-
-  module RegularPatternTree :
-    PatternTree.REGULAR_PATTERN_TREE
-      with module RankedAlphabet := RankedAlphabet
-       and type non_terminal := non_terminal
-
-  (* I'm not a fan of this grammar collection being part of this type. Not sure how to avoid it though... *)
-  module GrammarCollection : GrammarCollection.GRAMMAR_COLLECTION
-    with type grammar = TreeGrammar.Grammar.t
-    and type non_terminal = non_terminal
-
-  module TreePatternAssignments :
-    TreePatternAssignments.GRAMMAR_PATTERN_ASSIGNMENTS
-      with type sentence = TreeGrammar.Grammar.sentence
-       and module GrammarCollection = GrammarCollection
-
-  module Pattern :
-    PATTERN
-      with type input = RegularPatternTree.t
-       and type obj = TreeGrammar.Tree.t
-       and type assignments = TreePatternAssignments.t
-end

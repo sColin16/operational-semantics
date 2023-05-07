@@ -1,4 +1,7 @@
-(* TODO: should we flatten this so that the grammar functions are at the top-level here? *)
+(* TODO: should we flatten this so that the grammar functions are at the top-level here?
+ * To what extent should I consider subsitute replacing thing (e.g. sentence and sentential_form types). Would that break anything else
+  that used this type, as far as internal modules?
+*)
 module type TREE_GRAMMAR = sig
   type non_terminal
 

@@ -1,13 +1,13 @@
 module type EVAL_RULE = sig
   type t
   type term
-  type pattern
-  type eval_relation = pattern * pattern
+  type eval_relation
 
-  val of_patterns : eval_relation list -> eval_relation -> t
-  (** [of_patterns premises conclusion] creates an evaluation rule (an inference rule)
-      from the given premises and conclusion. May throw Invalid_argument if the premises
-      or conclusion do not form a valid evaluation rule *)
+  val of_rule : eval_relation list -> eval_relation -> t
+  (** [of_rule premises conclusion] creates an evaluation rule from the
+      components of an inference rule: the given premises and conclusion. May
+      throw Invalid_argument if the premises or conclusion do not form a valid
+      evaluation rule *)
 
   val evaluate : t -> (term -> term option) -> term -> term option
   (** [evaluate eval_rule global_eval term] evaluates the term against the evaluation rule,
@@ -15,25 +15,51 @@ module type EVAL_RULE = sig
       evaluation function *)
 end
 
+module type EVAL_RULE_INPUT = sig
+  (* Required for external type *)
+  type term
+
+  (* Required for internal rule verifier *)
+  type non_terminal
+
+  (* Required for internal rule verifier *)
+  module PatternTree :
+    PatternTree.REGULAR_PATTERN_TREE with type non_terminal = non_terminal
+
+  (* Required as type constraint for pattern to merge assignments *)
+  module TreePatternAssignments :
+    TreePatternAssignments.GRAMMAR_PATTERN_ASSIGNMENTS
+
+  (* Required for external type *)
+  module Pattern :
+    Pattern.PATTERN
+      with type obj = term
+       and type assignments = TreePatternAssignments.t
+       and type input = PatternTree.t
+end
+
 module EvalRuleImpl =
 functor
   (RuleVerifierMake : EvalRuleVerifier.MAKE_FUNCTOR)
-  (Input : Pattern.REGULAR_PATTERN)
+  (Input : EVAL_RULE_INPUT)
   ->
   struct
-    type term = Input.TreeGrammar.Tree.t
-    type pattern = Input.Pattern.t
-    type eval_relation = pattern * pattern
+    type term = Input.term
+    type eval_relation = Input.Pattern.t * Input.Pattern.t
 
     type t = {
       ordered_premises : eval_relation list;
       conclusion : eval_relation;
     }
 
-    (* TODO: It would probably be good to destructur this module just to decouple the input types *)
-    module RuleVerifier = RuleVerifierMake (Input)
+    module RuleVerifier = RuleVerifierMake (struct
+      type non_terminal = Input.non_terminal
 
-    let of_patterns premises conclusion =
+      module PatternTree = Input.PatternTree
+      module Pattern = Input.Pattern
+    end)
+
+    let of_rule premises conclusion =
       let ordered_premises = RuleVerifier.order_premises premises conclusion in
       match ordered_premises with
       | Some valid_ordered_premises ->
@@ -80,10 +106,10 @@ functor
               Some (Input.Pattern.substitute_with conc_right final_assigments))
   end
 
-module type MAKE_FUNCTOR = functor (Input : Pattern.REGULAR_PATTERN) ->
+module type MAKE_FUNCTOR = functor (Input : EVAL_RULE_INPUT) ->
   EVAL_RULE
-    with type term = Input.TreeGrammar.Tree.t
-     and type pattern = Input.Pattern.t
+    with type term = Input.term
+     and type eval_relation = Input.Pattern.t * Input.Pattern.t
 
 module type CUSTOM_MAKE_FUNCTOR = functor (_ : EvalRuleVerifier.MAKE_FUNCTOR) ->
   MAKE_FUNCTOR

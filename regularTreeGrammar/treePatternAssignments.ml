@@ -57,12 +57,15 @@ functor
 
     let singleton_opt key tree =
       let non_term, index = key in
-      match GrammarElement.create_opt tree (Input.GrammarCollection.mapping non_term) with
+      match
+        GrammarElement.create_opt tree
+          (Input.GrammarCollection.mapping non_term)
+      with
       | Some wrapped_elt ->
           Some (AssignmentMap.singleton (non_term, index) wrapped_elt)
       | None -> None
 
-    let rec find_opt key assignments =
+    let find_opt key assignments =
       match AssignmentMap.find_opt key assignments with
       | Some wrapped_elt -> Some (GrammarElement.unwrap wrapped_elt)
       | None -> None
@@ -88,7 +91,7 @@ functor
 module type MAKE_FUNCTOR = functor (Input : TREE_ASSIGNMENT_INPUT) ->
   GRAMMAR_PATTERN_ASSIGNMENTS
     with type sentence = Input.Grammar.sentence
-    and module GrammarCollection = Input.GrammarCollection
+     and module GrammarCollection = Input.GrammarCollection
 
 module type CUSTOM_MAKE_FUNCTOR = functor
   (_ : SetElement.MAKE_SENTENCE_FUNCTOR)

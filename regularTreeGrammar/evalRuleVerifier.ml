@@ -2,17 +2,29 @@ module type EVAL_RULE_VERIFIER = sig
   type premises
   type conclusion
 
-  (* TODO: is this unnecessarily abstract? *)
+  (* TODO: is this unnecessarily abstract? I'm leaning towards no, it's a great abstraction for if I chose to represent premises some other way *)
   val order_premises : premises -> conclusion -> premises option
   (** [order_premises premises conclusion] verifies that the premises and
       conclusion are valid and returns an ordered list in which the premises can
       be evaluated if so *)
 end
 
+module type EVAL_RULE_INPUT = sig
+  (* Required to extract and operate on metavariables *)
+  type non_terminal
+
+  (* Required as type constraint to destructure patterns *)
+  module PatternTree :
+    PatternTree.REGULAR_PATTERN_TREE with type non_terminal = non_terminal
+
+  (* Required as the external type for premises and conclusions *)
+  module Pattern : Pattern.PATTERN with type input = PatternTree.t
+end
+
 (** An internal module to validate the integrity of an evaluation rule *)
 module EvalRuleImpl =
 functor
-  (Input : Pattern.REGULAR_PATTERN)
+  (Input : EVAL_RULE_INPUT)
   ->
   struct
     type eval_relation = Input.Pattern.t * Input.Pattern.t
@@ -64,8 +76,8 @@ functor
     let rec extract_metavariables (pattern : Input.Pattern.t) =
       extract_metavariables_rec (Input.Pattern.unwrap pattern)
 
-    and extract_metavariables_rec (pattern : Input.RegularPatternTree.t) =
-      match Input.RegularPatternTree.destructure pattern with
+    and extract_metavariables_rec (pattern : Input.PatternTree.t) =
+      match Input.PatternTree.destructure pattern with
       | Symbol (_, children) ->
           List.fold_left MetavariableSet.union MetavariableSet.empty
             (List.map extract_metavariables_rec children)
@@ -176,6 +188,7 @@ functor
              (graph.conclusion_left :: graph.conclusion_right :: graph.premises))
       in
       (* TODO: is there some declarative data structure where we can do this iteration over the stack w/o a while loop? *)
+      (* I think we could write a better functional version of this without the while loop *)
       let () =
         (* Perform DFS, with catch of honoring the dependency number for rule nodes *)
         while List.length !stack > 0 do
@@ -237,7 +250,7 @@ functor
       eval_graph graph
   end
 
-module type MAKE_FUNCTOR = functor (Input : Pattern.REGULAR_PATTERN) ->
+module type MAKE_FUNCTOR = functor (Input : EVAL_RULE_INPUT) ->
   EVAL_RULE_VERIFIER
     with type premises = (Input.Pattern.t * Input.Pattern.t) list
      and type conclusion = Input.Pattern.t * Input.Pattern.t

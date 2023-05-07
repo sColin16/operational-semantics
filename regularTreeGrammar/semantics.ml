@@ -14,19 +14,73 @@ module type SEMANTICS = sig
       evaluation relation *)
 end
 
+module type SEMANTICS_INPUT = sig
+  (* Required for internal creation of Pattern module *)
+  module RankedAlphabet : Common.RANKED_ALPHABET
+
+  (* Required type constraint for PatternTrees for EvalRule *)
+  type non_terminal
+
+  (* Required for external type *)
+  module PatternTree :
+    PatternTree.REGULAR_PATTERN_TREE
+      with type non_terminal = non_terminal
+       and module RankedAlphabet = RankedAlphabet
+
+  (* Required for the internal creation of a pattern, grammar collection constraint *)
+  module TreeGrammar :
+    TreeGrammar.TREE_GRAMMAR
+      with type non_terminal = non_terminal
+      with module RankedAlphabet = RankedAlphabet
+
+  (* Required for constraint on the internal pattern *)
+  (* I'm not a fan of this grammar collection being part of this type. Not sure how to avoid it though... *)
+  module GrammarCollection :
+    GrammarCollection.GRAMMAR_COLLECTION
+      with type grammar = TreeGrammar.Grammar.t
+       and type non_terminal = non_terminal
+end
+
 module SemanticsImpl =
 functor
   (EvalRuleMake : EvalRule.MAKE_FUNCTOR)
-  (Input : Pattern.REGULAR_PATTERN)
+  (PatternMake : Pattern.MAKE_FUNCTOR)
+  (TreePatternAssignmentsMake : TreePatternAssignments.MAKE_FUNCTOR)
+  (Input : SEMANTICS_INPUT)
   ->
   struct
     type term = Input.TreeGrammar.Tree.t
-    type pattern = Input.Pattern.t
-    type eval_relation = pattern * pattern
-    type eval_rule = eval_relation list * eval_relation
 
-    (* TODO: consider deconstructing this module to decouple the types *)
-    module EvalRule = EvalRuleMake (Input)
+    type eval_rule =
+      (Input.PatternTree.t * Input.PatternTree.t) list
+      * (Input.PatternTree.t * Input.PatternTree.t)
+
+    module TreePatternAssignments = TreePatternAssignmentsMake (struct
+      type non_terminal = Input.non_terminal
+
+      module Grammar = Input.TreeGrammar.Grammar
+      module GrammarCollection = Input.GrammarCollection
+    end)
+
+    module Pattern = PatternMake (struct
+      module RankedAlphabet = Input.RankedAlphabet
+
+      type non_terminal = Input.non_terminal
+
+      module TreeGrammar = Input.TreeGrammar
+      module PatternTree = Input.PatternTree
+      module GrammarCollection = Input.GrammarCollection
+      module TreePatternAssignments = TreePatternAssignments
+    end)
+
+    module EvalRule = EvalRuleMake (struct
+      type term = Input.TreeGrammar.Tree.t
+      type non_terminal = Input.non_terminal
+
+      module PatternTree = Input.PatternTree
+      module TreePatternAssignments = TreePatternAssignments
+      module Pattern = Pattern
+    end)
 
     type t = EvalRule.t list
 
@@ -36,12 +90,19 @@ functor
       let compare = compare
     end)
 
-    let of_rules eval_rules =
-      List.map
-        (fun eval_rule ->
-          let premises, conclusion = eval_rule in
-          EvalRule.of_patterns premises conclusion)
-        eval_rules
+    let verify_eval_relation
+        (eval_relation : Input.PatternTree.t * Input.PatternTree.t) =
+      let left, right = eval_relation in
+      (Pattern.create left, Pattern.create right)
+
+    let verify_eval_rule (eval_rule : eval_rule) =
+      let premises, conclusion = eval_rule in
+      EvalRule.of_rule
+        (List.map verify_eval_relation premises)
+        (verify_eval_relation conclusion)
+
+    let of_rules (eval_rules : eval_rule list) =
+      List.map verify_eval_rule eval_rules
 
     let rec try_rule (semantics : t) (term : term) (queried : TermSet.t)
         (acc : term option) (eval_rule : EvalRule.t) =
@@ -61,14 +122,20 @@ functor
       evaluate_rec semantics TermSet.empty term
   end
 
-module type MAKE_FUNCTOR = functor (Input : Pattern.REGULAR_PATTERN) ->
+module type MAKE_FUNCTOR = functor (Input : SEMANTICS_INPUT) ->
   SEMANTICS
     with type term = Input.TreeGrammar.Tree.t
      and type eval_rule =
-      (Input.Pattern.t * Input.Pattern.t) list
-      * (Input.Pattern.t * Input.Pattern.t)
+      (Input.PatternTree.t * Input.PatternTree.t) list
+      * (Input.PatternTree.t * Input.PatternTree.t)
 
-module type CUSTOM_MAKE_FUNCTOR = functor (_ : EvalRule.MAKE_FUNCTOR) -> MAKE_FUNCTOR
+module type CUSTOM_MAKE_FUNCTOR = functor
+  (_ : EvalRule.MAKE_FUNCTOR)
+  (_ : Pattern.MAKE_FUNCTOR)
+  (_ : TreePatternAssignments.MAKE_FUNCTOR)
+  -> MAKE_FUNCTOR
 
 module CustomMake : CUSTOM_MAKE_FUNCTOR = SemanticsImpl
-module Make : MAKE_FUNCTOR = CustomMake (EvalRule.Make)
+
+module Make : MAKE_FUNCTOR =
+  CustomMake (EvalRule.Make) (Pattern.Make) (TreePatternAssignments.Make)

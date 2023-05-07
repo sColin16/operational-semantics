@@ -1,4 +1,3 @@
-(** TODO: can we combine all of these different tree types under a uniform tree module. Oh God, what a journey this led me on *)
 module type REGULAR_PATTERN_TREE = sig
   type t
 
