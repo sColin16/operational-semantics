@@ -3,23 +3,21 @@ module type GRAMMAR_PATTERN_ASSIGNMENTS = sig
   type non_terminal
   type grammar
   type sentence
-  type key = non_terminal * int
-  type grammar_collection_t = non_terminal -> grammar
 
   (* I have decided to include this as a value in the module, as it is part of the semantics. You must be using the same
      grammar collection ot merge assignments, and including this in the module enforces that at the type level *)
 
-  val grammar_collection : grammar_collection_t
+  val grammar_collection : non_terminal -> grammar
   (** A mapping definig the grammar for each non-terminal. Usually, these all share the same productions *)
 
   val empty : t
   (** An empty assignment mapping *)
 
-  val singleton_opt : key -> sentence -> t option
+  val singleton_opt : non_terminal * int -> sentence -> t option
   (** [singleton_opt key sentence] returns a singleton assignment mapping, if
       the sentence is assignable to the given key *)
 
-  val find_opt : key -> t -> sentence option
+  val find_opt : non_terminal * int -> t -> sentence option
   (** [find_opt key assignment] returns the corresponding assignment for the
       key, if it exists *)
 
@@ -42,13 +40,11 @@ functor
     type non_terminal = Input.TreeGrammar.non_terminal
     type grammar = Input.TreeGrammar.t
     type sentence = Input.TreeGrammar.sentence
-    type key = non_terminal * int
-    type grammar_collection_t = non_terminal -> grammar
 
     module GrammarElement = GrammarElementMake (Input.TreeGrammar)
 
     module AssignmentMap = Map.Make (struct
-      type t = key
+      type t = non_terminal * int
 
       let compare = compare
     end)

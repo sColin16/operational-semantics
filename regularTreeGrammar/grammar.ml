@@ -142,7 +142,7 @@ module type TREE_GRAMMAR = sig
 
   module Grammar :
     GRAMMAR
-      with type non_terminal := non_terminal
-       and type sentence := Tree.t
-       and type sentential_form := SententialTree.t
+      with type non_terminal = non_terminal
+       and type sentence = Tree.t
+       and type sentential_form = SententialTree.t
 end

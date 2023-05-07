@@ -5,7 +5,10 @@ module type PATTERN = sig
   type input
 
   val create : input -> t
-  (** Creates a pattern if the pattern is considered valid. May throw Invalid_argument *)
+  (** Creates a pattern if the pattern is considered valid. May raise Invalid_argument *)
+
+  val unwrap : t -> input
+  (** The inverse operation of create, returns the underlying pattern input type *)
 
   val match_on : t -> obj -> assignments option
   (** Matches an object again a pattern, extracting the assignments if the
@@ -28,38 +31,57 @@ module type PATTERN = sig
      a different instance of the pattern to handle that. You could combine those into a larger module if deisred *)
 end
 
+(* TODO: do the assignment need to be concrete? Or can we get away keeping them abstract? *)
+(* If I need to make them concrete, it's actually pretty simple *)
 module type REG_TREE_PATTERN_INPUT = sig
   module RankedAlphabet : Common.RANKED_ALPHABET
 
   type non_terminal
+
+  (* I like the TREE_GRAMMAR type here because it reduces the number of type constraints I need to type here.
+     It does possible introduce additional type constraints that may not be necessary, but I think worrying
+     about that is kinda like worrying about passing functions instead of modules: it adds additional complexity
+     and more tightly couple the input here to the implementation below *)
+  module TreeGrammar :
+    Grammar.TREE_GRAMMAR
+      with module RankedAlphabet := RankedAlphabet
+       and type non_terminal := non_terminal
 
   module RegularPatternTree :
     PatternTree.REGULAR_PATTERN_TREE
       with module RankedAlphabet := RankedAlphabet
        and type non_terminal := non_terminal
 
-  module TreeGrammar :
-    Grammar.TREE_GRAMMAR
-      with type non_terminal := non_terminal
-       and module RankedAlphabet := RankedAlphabet
-
+  (* TODO: somehow need to constrain the grammar collection for this to match? *)
   module TreePatternAssignments :
     TreePatternAssignments.GRAMMAR_PATTERN_ASSIGNMENTS
-      with type non_terminal := non_terminal
-       and type sentence := TreeGrammar.Tree.t
-       and type grammar := TreeGrammar.Grammar.t
+      with type non_terminal = non_terminal
+       and type grammar = TreeGrammar.Grammar.t
+       and type sentence = TreeGrammar.Grammar.sentence
+
+  (* TODO: should this be a grammar instance instead? Or do we constrain it to be part of the grammar collection? *)
+  val primary_non_terminal : non_terminal
+  val grammar_collection : non_terminal -> TreeGrammar.Grammar.t
 end
 
-module FreeTreePatternImpl =
+module TreePatternImpl =
 functor
+  (ValidTreePatternMake : SetElement.MAKE_PATTERN_TREE_FUNCTOR)
   (Input : REG_TREE_PATTERN_INPUT)
   ->
   struct
+    module ValidPatternTree = ValidTreePatternMake (struct
+      type non_terminal = Input.non_terminal
+
+      module RankedAlphabet = Input.RankedAlphabet
+      module TreeGrammar = Input.TreeGrammar
+      module PatternTree = Input.RegularPatternTree
+    end)
+
     type obj = Input.TreeGrammar.Tree.t
-    type non_terminal = Input.non_terminal
     type assignments = Input.TreePatternAssignments.t
     type input = Input.RegularPatternTree.t
-    type t = input
+    type t = ValidPatternTree.t
 
     let rec match_on_rec (pattern : Input.RegularPatternTree.t) (tree : obj) =
       match
@@ -93,81 +115,64 @@ functor
           | None -> raise (Invalid_argument "assignment was incomplete")
           | Some tree -> tree)
 
-    let create (pattern_tree : input) = pattern_tree
-    let match_on (pattern : t) (tree : obj) = match_on_rec pattern tree
+    let create (pattern_tree : input) =
+      let primary_grammar =
+        Input.grammar_collection Input.primary_non_terminal
+      in
+      match ValidPatternTree.create_opt pattern_tree primary_grammar with
+      | Some valid_tree -> valid_tree
+      | None ->
+          raise
+            (Invalid_argument
+               "The pattern tree was not an element of the primary grammar")
+
+    let unwrap pattern_tree = ValidPatternTree.unwrap pattern_tree
+
+    let match_on (pattern : t) (tree : obj) =
+      match_on_rec (ValidPatternTree.unwrap pattern) tree
 
     let substitute_with (pattern : t) (assignments : assignments) =
-      substitute_with_rec pattern assignments
+      substitute_with_rec (ValidPatternTree.unwrap pattern) assignments
   end
 
-module type FREE_MAKE_FUNCTOR = functor (Input : REG_TREE_PATTERN_INPUT) ->
+module type MAKE_FUNCTOR = functor (Input : REG_TREE_PATTERN_INPUT) ->
   PATTERN
     with type input = Input.RegularPatternTree.t
      and type obj = Input.TreeGrammar.Tree.t
      and type assignments = Input.TreePatternAssignments.t
 
-module FreeMake : FREE_MAKE_FUNCTOR = FreeTreePatternImpl
+module type CUSTOM_MAKE_FUNCTOR = functor
+  (_ : SetElement.MAKE_PATTERN_TREE_FUNCTOR)
+  -> MAKE_FUNCTOR
 
-module type CONSTRAINED_TREE_PATTERN_INPUT = sig
+module CustomMake : CUSTOM_MAKE_FUNCTOR = TreePatternImpl
+module Make : MAKE_FUNCTOR = TreePatternImpl (SetElement.MakePatternTree)
+
+(** TODO: does this need to accept grammar collection somewhere? *)
+module type REGULAR_PATTERN = sig
+  type non_terminal
+
   module RankedAlphabet : Common.RANKED_ALPHABET
 
-  type non_terminal
+  module TreeGrammar :
+    Grammar.TREE_GRAMMAR
+      with type non_terminal = non_terminal
+      with module RankedAlphabet = RankedAlphabet
 
   module RegularPatternTree :
     PatternTree.REGULAR_PATTERN_TREE
       with module RankedAlphabet := RankedAlphabet
        and type non_terminal := non_terminal
 
-  module TreeGrammar :
-    Grammar.TREE_GRAMMAR
-      with type non_terminal := non_terminal
-       and module RankedAlphabet := RankedAlphabet
-
   module TreePatternAssignments :
     TreePatternAssignments.GRAMMAR_PATTERN_ASSIGNMENTS
-      with type non_terminal := non_terminal
-       and type sentence := TreeGrammar.Tree.t
-       and type grammar := TreeGrammar.Grammar.t
+      with type non_terminal = non_terminal
+       and type grammar = TreeGrammar.Grammar.t
+       and type sentence = TreeGrammar.Grammar.sentence
 
-  module ValidPatternTree :
-    SetElement.SET_ELEMENT
-      with type elt = RegularPatternTree.t
-       and type set = TreeGrammar.Grammar.t
-end
-
-module ConstrainedPatternTreeImpl =
-functor
-  (FreeTreePatternMake : FREE_MAKE_FUNCTOR)
-  (Input : CONSTRAINED_TREE_PATTERN_INPUT)
-  ->
-  struct
-    module FreeTreePattern = FreeTreePatternMake (Input)
-
-    type t = Input.ValidPatternTree.t
-    type obj = Input.TreeGrammar.Tree.t
-    type assignments = Input.TreePatternAssignments.t
-    type input = Input.ValidPatternTree.t
-    type non_terminal = Input.non_terminal
-
-    let to_free_pattern pattern =
-      FreeTreePattern.create (Input.ValidPatternTree.unwrap pattern)
-
-    let create pattern_tree = pattern_tree
-
-    let match_on pattern tree =
-      FreeTreePattern.match_on (to_free_pattern pattern) tree
-
-    let substitute_with pattern assignments =
-      FreeTreePattern.substitute_with (to_free_pattern pattern) assignments
-  end
-
-  module type MAKE_FUNCTOR = functor (Input : CONSTRAINED_TREE_PATTERN_INPUT) ->
+  module Pattern :
     PATTERN
-      with type input = Input.ValidPatternTree.t
-       and type obj = Input.TreeGrammar.Tree.t
-       and type assignments = Input.TreePatternAssignments.t
-
-  module type CUSTOM_MAKE_FUNCTOR = functor (_ : FREE_MAKE_FUNCTOR) -> MAKE_FUNCTOR
-
-  module CustomMake : CUSTOM_MAKE_FUNCTOR = ConstrainedPatternTreeImpl
-  module Make : MAKE_FUNCTOR = CustomMake (FreeMake)
+      with type input = RegularPatternTree.t
+       and type obj = TreeGrammar.Tree.t
+       and type assignments = TreePatternAssignments.t
+end

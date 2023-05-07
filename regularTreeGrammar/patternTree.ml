@@ -12,8 +12,6 @@ module type REGULAR_PATTERN_TREE = sig
     | Symbol of RankedAlphabet.symbol * t list
     | NonTerminal of non_terminal * int
 
-  exception Invalid_arity of string
-
   val symbol : RankedAlphabet.symbol -> t list -> t
   (** Constructs a tree from a symbol and a list of its children trees
     Raises Invalid_arity if the arity invariant for the node is not met *)
@@ -36,8 +34,6 @@ functor
 
     module RankedAlphabet = Alphabet.RankedAlphabet
 
-    exception Invalid_arity of string
-
     type labeled_non_term = non_terminal * int
 
     module SentTree = SentTreeMake (struct
@@ -54,7 +50,7 @@ functor
 
     let symbol symbol children =
       try SentTree.symbol symbol children
-      with SentTree.Invalid_arity s -> raise (Invalid_arity s)
+      with Invalid_argument s -> raise (Invalid_argument s)
 
     let non_terminal non_term label = SentTree.non_terminal (non_term, label)
 
