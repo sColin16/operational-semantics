@@ -2,14 +2,13 @@ open TestHelpers
 open Example.Abstract
 
 let assert_is_element name tree grammar =
-  assert_true name (AbstractGrammar.is_element tree grammar)
+  assert_true name (AbstractGrammar.Grammar.is_element tree grammar)
 
 let assert_not_element name tree grammar =
-  assert_false name (AbstractGrammar.is_element tree grammar)
+  assert_false name (AbstractGrammar.Grammar.is_element tree grammar)
 
 let null_productions non_term = match non_term with _ -> []
-let null_grammar = AbstractGrammar.create_grammar F null_productions
-let invalid_tree : AbstractGrammar.tree = `Symbol (D, [])
+let null_grammar = AbstractGrammar.Grammar.of_productions F null_productions
 let single_node_tree = parse_abstract_tree A
 let simple_tree = parse_abstract_tree (D (C (B A, A), B A, A))
 
@@ -22,7 +21,7 @@ let empty_no_loops_productions =
       | I -> [])
 
 let empty_no_loop_grammar =
-  AbstractGrammar.create_grammar F empty_no_loops_productions
+  AbstractGrammar.Grammar.of_productions F empty_no_loops_productions
 
 let empty_no_loop_tree1 = parse_abstract_tree (C (D (B A, A, B A), A))
 let empty_no_loop_tree2 = parse_abstract_tree (D (B A, C (B A, A), A))
@@ -36,7 +35,7 @@ let empty_symbol_loops_productions =
       | I -> [])
 
 let empty_symbol_loop_grammar =
-  AbstractGrammar.create_grammar F empty_symbol_loops_productions
+  AbstractGrammar.Grammar.of_productions F empty_symbol_loops_productions
 
 let empty_symbol_loop_tree1 =
   parse_abstract_tree (B (C (A, B (D (C (B (B A), B (B A)), B A, A)))))
@@ -58,7 +57,7 @@ let empty_loop_productions =
       | H -> [ H; G; F; B (D (I, B F, A)) ]
       | I -> [ I; H; G; D (H, B I, A) ])
 
-let empty_loop_grammar = AbstractGrammar.create_grammar F empty_loop_productions
+let empty_loop_grammar = AbstractGrammar.Grammar.of_productions F empty_loop_productions
 
 let empty_loop_tree1 =
   parse_abstract_tree
@@ -90,10 +89,10 @@ let single_derivable_productions =
       | I -> [ B A ])
 
 let single_direct_grammar =
-  AbstractGrammar.create_grammar F single_direct_productions
+  AbstractGrammar.Grammar.of_productions F single_direct_productions
 
 let single_derviable_grammar =
-  AbstractGrammar.create_grammar F single_derivable_productions
+  AbstractGrammar.Grammar.of_productions F single_derivable_productions
 
 let single_member_tree =
   parse_abstract_tree (D (A, D (C (B A, A), C (A, A), A), C (A, A)))
@@ -110,7 +109,7 @@ let infinite_simple_productions =
       | I -> [ A; C (G, H) ])
 
 let infinite_simple_grammar =
-  AbstractGrammar.create_grammar F infinite_simple_productions
+  AbstractGrammar.Grammar.of_productions F infinite_simple_productions
 
 let infinite_simple_member_tree1 = parse_abstract_tree A
 let infinite_simple_member_tree2 = parse_abstract_tree (C (A, A))
@@ -145,7 +144,7 @@ let infinite_loop_productions =
       | I -> [ I; F; G; H; A ])
 
 let infinite_loop_grammar =
-  AbstractGrammar.create_grammar F infinite_loop_productions
+  AbstractGrammar.Grammar.of_productions F infinite_loop_productions
 
 let infinite_loop_member_tree1 = parse_abstract_tree A
 let infinite_loop_member_tree2 = parse_abstract_tree (B A)
@@ -173,7 +172,7 @@ let infinite_ambiguous_productions =
       | I -> [ F; B A; B (C (C (A, F), G)) ])
 
 let infinite_ambiguous_grammar =
-  AbstractGrammar.create_grammar F infinite_ambiguous_productions
+  AbstractGrammar.Grammar.of_productions F infinite_ambiguous_productions
 
 let infinite_ambiguous_member_tree1 = parse_abstract_tree A
 let infinite_ambiguous_member_tree2 = parse_abstract_tree (B A)
@@ -202,11 +201,6 @@ let () =
     [
       ( "null_grammar",
         [
-          assert_raises "bad arity tree"
-            (AbstractGrammar.Invalid_tree
-               "The provided tree did not belong to the grammar's alphabet")
-            (fun () ->
-              ignore (AbstractGrammar.is_element invalid_tree null_grammar));
           assert_not_element "null grammar membership A" single_node_tree
             null_grammar;
           assert_not_element "null grammar membership B" simple_tree

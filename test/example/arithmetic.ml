@@ -1,15 +1,19 @@
-type arithmetic_symbols = Zero | Succ | Plus
-type arithmetic_non_terminals = T | V
+module ArithmeticAlphabet = struct
+  module RankedAlphabet = struct
+    type symbol = Zero | Succ | Plus
 
-let arithmetic_ranked_alphabet (symbol : arithmetic_symbols) =
-  match symbol with Zero -> 0 | Succ -> 1 | Plus -> 2
+    let arity symbol = match symbol with Zero -> 0 | Succ -> 1 | Plus -> 2
+  end
 
-module ArithmeticGrammar = RegularTreeGrammar.Make (struct
-  type symbol = arithmetic_symbols
-  type non_terminal = arithmetic_non_terminals
+  type non_terminal = T | V
+end
 
-  let ranked_alphabet = arithmetic_ranked_alphabet
-end)
+module ArithmeticGrammar = RegularTreeGrammar.TreeGrammar.Make (ArithmeticAlphabet)
+
+type arithmetic_tree =
+  | Zero
+  | Succ of arithmetic_tree
+  | Plus of arithmetic_tree * arithmetic_tree
 
 type arithmetic_sent_tree =
   | Zero
@@ -18,30 +22,29 @@ type arithmetic_sent_tree =
   | T
   | V
 
-type arithmetic_tree =
-  | Zero
-  | Succ of arithmetic_tree
-  | Plus of arithmetic_tree * arithmetic_tree
+let rec parse_arithmetic_tree (tree : arithmetic_tree) :
+    ArithmeticGrammar.Tree.t =
+  let open ArithmeticGrammar.Tree in
+  match tree with
+  | Zero -> node Zero []
+  | Succ a -> node Succ (List.map parse_arithmetic_tree [ a ])
+  | Plus (a, b) -> node Plus (List.map parse_arithmetic_tree [ a; b ])
 
 let rec parse_arithmetic_sent_tree (tree : arithmetic_sent_tree) :
-    ArithmeticGrammar.sent_tree =
+    ArithmeticGrammar.SententialTree.t =
+  let open ArithmeticGrammar.SententialTree in
   match tree with
-  | Zero -> `Symbol (Zero, [])
-  | Succ a -> `Symbol (Succ, List.map parse_arithmetic_sent_tree [ a ])
-  | Plus (a, b) -> `Symbol (Plus, List.map parse_arithmetic_sent_tree [ a; b ])
-  | T -> `NonTerminal T
-  | V -> `NonTerminal V
-
-let rec parse_arithmetic_tree (tree : arithmetic_tree) : ArithmeticGrammar.tree
-    =
-  match tree with
-  | Zero -> `Symbol (Zero, [])
-  | Succ a -> `Symbol (Succ, List.map parse_arithmetic_tree [ a ])
-  | Plus (a, b) -> `Symbol (Plus, List.map parse_arithmetic_tree [ a; b ])
+  | Zero -> symbol Zero []
+  | Succ a -> symbol Succ (List.map parse_arithmetic_sent_tree [ a ])
+  | Plus (a, b) -> symbol Plus (List.map parse_arithmetic_sent_tree [ a; b ])
+  | T -> non_terminal T
+  | V -> non_terminal V
 
 let parse_arithmetic_productions
-    (productions : arithmetic_non_terminals -> arithmetic_sent_tree list) :
-    arithmetic_non_terminals -> ArithmeticGrammar.sent_tree list =
+    (productions : ArithmeticAlphabet.non_terminal -> arithmetic_sent_tree list)
+    :
+    ArithmeticAlphabet.non_terminal ->
+    ArithmeticGrammar.SententialTree.t list =
  fun non_term -> List.map parse_arithmetic_sent_tree (productions non_term)
 
 let primary_arithmetic_productions =
@@ -51,4 +54,4 @@ let primary_arithmetic_productions =
       | V -> [ Zero; Succ V ])
 
 let primary_arithmetic_grammar =
-  ArithmeticGrammar.create_grammar T primary_arithmetic_productions
+  ArithmeticGrammar.Grammar.of_productions T primary_arithmetic_productions

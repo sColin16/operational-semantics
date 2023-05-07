@@ -1,21 +1,21 @@
-type boolean_symbols = True | False | Not | And | Or | If
-type boolean_non_terminals = T | V | A | B
+module BooleanAlphabet = struct
+  module RankedAlphabet = struct
+    type symbol = True | False | Not | And | Or | If
 
-let boolean_ranked_alphabet (symbol : boolean_symbols) =
-  match symbol with
-  | True -> 0
-  | False -> 0
-  | Not -> 1
-  | And -> 2
-  | Or -> 2
-  | If -> 3
+    let arity symbol =
+      match symbol with
+      | True -> 0
+      | False -> 0
+      | Not -> 1
+      | And -> 2
+      | Or -> 2
+      | If -> 3
+  end
 
-module BooleanGrammar = RegularTreeGrammar.Make (struct
-  type symbol = boolean_symbols
-  type non_terminal = boolean_non_terminals
+  type non_terminal = T | V | A | B
+end
 
-  let ranked_alphabet = boolean_ranked_alphabet
-end)
+module BooleanGrammar = RegularTreeGrammar.TreeGrammar.Make(BooleanAlphabet)
 
 type boolean_tree =
   | True
@@ -37,32 +37,35 @@ type boolean_sent_tree =
   | A
   | B
 
-let rec parse_boolean_sent_tree (tree : boolean_sent_tree) :
-    BooleanGrammar.sent_tree =
+let rec parse_boolean_tree (tree : boolean_tree) :
+    BooleanGrammar.Tree.t =
+  let open BooleanGrammar.Tree in
   match tree with
-  | True -> `Symbol (True, [])
-  | False -> `Symbol (False, [])
-  | Not a -> `Symbol (Not, List.map parse_boolean_sent_tree [ a ])
-  | And (a, b) -> `Symbol (And, List.map parse_boolean_sent_tree [ a; b ])
-  | Or (a, b) -> `Symbol (Or, List.map parse_boolean_sent_tree [ a; b ])
-  | If (a, b, c) -> `Symbol (If, List.map parse_boolean_sent_tree [ a; b; c ])
-  | T -> `NonTerminal T
-  | V -> `NonTerminal V
-  | A -> `NonTerminal A
-  | B -> `NonTerminal B
+  | True -> node True []
+  | False -> node False []
+  | Not a -> node Not (List.map parse_boolean_tree [ a ])
+  | And (a, b) -> node And (List.map parse_boolean_tree [ a; b ])
+  | Or (a, b) -> node Or (List.map parse_boolean_tree [ a; b ])
+  | If (a, b, c) -> node If (List.map parse_boolean_tree [ a; b; c ])
 
-let rec parse_boolean_tree (tree : boolean_tree) : BooleanGrammar.tree =
+let rec parse_boolean_sent_tree (tree : boolean_sent_tree) :
+    BooleanGrammar.SententialTree.t =
+  let open BooleanGrammar.SententialTree in
   match tree with
-  | True -> `Symbol (True, [])
-  | False -> `Symbol (False, [])
-  | Not a -> `Symbol (Not, List.map parse_boolean_tree [ a ])
-  | And (a, b) -> `Symbol (And, List.map parse_boolean_tree [ a; b ])
-  | Or (a, b) -> `Symbol (Or, List.map parse_boolean_tree [ a; b ])
-  | If (a, b, c) -> `Symbol (If, List.map parse_boolean_tree [ a; b; c ])
+  | True -> symbol True []
+  | False -> symbol False []
+  | Not a -> symbol Not (List.map parse_boolean_sent_tree [ a ])
+  | And (a, b) -> symbol And (List.map parse_boolean_sent_tree [ a; b ])
+  | Or (a, b) -> symbol Or (List.map parse_boolean_sent_tree [ a; b ])
+  | If (a, b, c) -> symbol If (List.map parse_boolean_sent_tree [ a; b; c ])
+  | T -> non_terminal T
+  | V -> non_terminal V
+  | A -> non_terminal A
+  | B -> non_terminal B
 
 let parse_boolean_productions
-    (productions : boolean_non_terminals -> boolean_sent_tree list) :
-    boolean_non_terminals -> BooleanGrammar.sent_tree list =
+    (productions : BooleanAlphabet.non_terminal -> boolean_sent_tree list) :
+    BooleanAlphabet.non_terminal -> BooleanGrammar.SententialTree.t list =
  fun non_term -> List.map parse_boolean_sent_tree (productions non_term)
 
 let primary_boolean_productions =
@@ -73,4 +76,4 @@ let primary_boolean_productions =
       | _ -> [])
 
 let primary_boolean_grammar =
-  BooleanGrammar.create_grammar T primary_boolean_productions
+  BooleanGrammar.Grammar.of_productions T primary_boolean_productions
