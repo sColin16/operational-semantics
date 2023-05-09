@@ -7,11 +7,14 @@ module type SEMANTICS = sig
   val of_rules : eval_rule list -> t
   (** [of_rules eval_rules] Creates a semantics definition from the list of evaluation rules *)
 
-  val evaluate : t -> term -> term option
-  (** [evaluate semantics term] evaluates a term against some semantics, if the
+  (* TODO: update the comments here *)
+  val step : t -> term -> term option
+  (** [step semantics term] evaluates a term against some semantics, if the
       term can be evaluated under the semantics. This effectively determines the
       if the input term has a corresponding term that forms a pair in the
       evaluation relation *)
+
+  val evaluate : t -> term -> term
 end
 
 module type SEMANTICS_INPUT = sig
@@ -109,17 +112,23 @@ functor
       match acc with
       | Some _ -> acc
       | None ->
-          EvalRule.evaluate eval_rule (evaluate_rec semantics queried) term
+          EvalRule.step eval_rule (step_rec semantics queried) term
 
-    and evaluate_rec (semantics : t) (queried : TermSet.t) (term : term) =
+    and step_rec (semantics : t) (queried : TermSet.t) (term : term) =
       if TermSet.mem term queried then None
         (* Encountered a loop in evaluation: whatever path is being tried cannot have a finite proof tree *)
       else
         let new_queried = TermSet.add term queried in
         List.fold_left (try_rule semantics term new_queried) None semantics
 
-    let evaluate (semantics : t) (term : term) =
-      evaluate_rec semantics TermSet.empty term
+    let step (semantics : t) (term : term) =
+      step_rec semantics TermSet.empty term
+
+    let rec evaluate (semantics : t) (term : term) =
+      let evaluated = step semantics term in
+      match evaluated with
+      | None -> term
+      | Some next_term -> evaluate semantics next_term
   end
 
 module type MAKE_FUNCTOR = functor (Input : SEMANTICS_INPUT) ->

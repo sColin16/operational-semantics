@@ -6,12 +6,12 @@ module type TREE_GRAMMAR = sig
   type non_terminal
 
   module RankedAlphabet : Common.RANKED_ALPHABET
-  module Tree : Tree.TREE with module RankedAlphabet := RankedAlphabet
+  module Tree : Tree.TREE with module RankedAlphabet = RankedAlphabet
 
   module SententialTree :
     SententialTree.SENT_TREE
-      with type non_terminal := non_terminal
-       and module RankedAlphabet := RankedAlphabet
+      with type non_terminal = non_terminal
+       and module RankedAlphabet = RankedAlphabet
 
   module Grammar :
     Grammar.GRAMMAR

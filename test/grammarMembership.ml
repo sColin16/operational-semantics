@@ -306,5 +306,8 @@ let () =
             infinite_ambiguous_nonmember_tree2 infinite_ambiguous_grammar;
           assert_not_element "infinite ambiguous nonmember C"
             infinite_ambiguous_nonmember_tree3 infinite_ambiguous_grammar;
+
+          (* TODO: this needs to be moved to its own group, and we need others about derivability like it *)
+          assert_true "non-terminal derivation" (AbstractGrammar.Grammar.has_derivation (parse_abstract_sent_tree F) single_direct_grammar)
         ] );
     ]

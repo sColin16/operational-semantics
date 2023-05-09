@@ -52,6 +52,11 @@ functor
     let of_productions non_terminal productions =
       { start = non_terminal; productions }
 
+    let is_matching_non_term (non_term : non_terminal) (sent_tree : sentential_form) =
+      match (Input.SentTree.destructure sent_tree) with
+      | Symbol _ -> false
+      | NonTerminal non_term2 -> non_term = non_term2
+
     (** [non_term_has_derivation_rec] is a recursive helper for [non_term_has_derivation]
         which adds the parameter [queried] to track previous calls to the function.
         This allows the function to detect when it enters loops in the grammar
@@ -65,6 +70,7 @@ functor
         let new_queried =
           NonTermSentTreeSet.add (non_term, sent_tree) queried
         in
+        if is_matching_non_term non_term sent_tree then true else
         let sent_trees = productions non_term in
         List.exists
           (fun src_sent_tree ->

@@ -1,17 +1,17 @@
 module type TREE_SEMANTICS = sig
   type non_terminal
+  type term
 
   module RankedAlphabet : Common.RANKED_ALPHABET
-  module Tree : Tree.TREE with module RankedAlphabet := RankedAlphabet
 
   module PatternTree :
     PatternTree.REGULAR_PATTERN_TREE
-      with type non_terminal := non_terminal
-       and module RankedAlphabet := RankedAlphabet
+      with type non_terminal = non_terminal
+       and module RankedAlphabet = RankedAlphabet
 
   module Semantics :
     Semantics.SEMANTICS
-      with type term = Tree.t
+      with type term = term
        and type eval_rule =
         (PatternTree.t * PatternTree.t) list * (PatternTree.t * PatternTree.t)
 end
@@ -33,9 +33,9 @@ functor
   ->
   struct
     type non_terminal = Input.TreeGrammar.non_terminal
+    type term = Input.TreeGrammar.Tree.t
 
     module RankedAlphabet = Input.TreeGrammar.RankedAlphabet
-    module Tree = Input.TreeGrammar.Tree
 
     module PatternTree = PatternTreeMake (struct
       type non_terminal = Input.TreeGrammar.non_terminal
@@ -67,8 +67,8 @@ functor
 module type MAKE_FUNCTOR = functor (Input : TREE_SEMANTICS_INPUT) ->
   TREE_SEMANTICS
     with type non_terminal = Input.TreeGrammar.non_terminal
-     and module RankedAlphabet = Input.TreeGrammar.RankedAlphabet
-     and module Tree = Input.TreeGrammar.Tree
+    and type term = Input.TreeGrammar.Tree.t
+    and module RankedAlphabet = Input.TreeGrammar.RankedAlphabet
 
 module type CUSTOM_MAKE_FUNCTOR = functor
   (_ : PatternTree.MAKE_FUNCTOR)

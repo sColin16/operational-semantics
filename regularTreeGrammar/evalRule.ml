@@ -9,10 +9,12 @@ module type EVAL_RULE = sig
       throw Invalid_argument if the premises or conclusion do not form a valid
       evaluation rule *)
 
-  val evaluate : t -> (term -> term option) -> term -> term option
-  (** [evaluate eval_rule global_eval term] evaluates the term against the evaluation rule,
-      in the context of a given global_eval function, which is often a SEMANTICS
-      evaluation function *)
+  (* TODO: should we somehow get the global eval into the t type so that we don't need it in this public interface? *)
+  val step : t -> (term -> term option) -> term -> term option
+  (** [step eval_rule global_eval term] performs a single evaluation step on the
+  term against the evaluation rule, in the context of a given global_eval
+  function used to validate premises, which is often a SEMANTICS evaluation
+  function *)
 end
 
 module type EVAL_RULE_INPUT = sig
@@ -90,7 +92,7 @@ functor
               Input.TreePatternAssignments.merge_assignments
                 [ assignments_opt; new_assignments ])
 
-    let evaluate eval_rule global_eval term =
+    let step eval_rule global_eval term =
       let conc_left, conc_right = eval_rule.conclusion in
       match Input.Pattern.match_on conc_left term with
       | None -> None
